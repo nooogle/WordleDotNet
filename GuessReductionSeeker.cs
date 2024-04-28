@@ -1,32 +1,56 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 
-public class GuessReductionSeeker : IGuesser
+public class GuessReductionSeeker
 {
-    public GuessReductionSeeker() {}
+    private ImmutableArray<string> laWords;
+    private ImmutableArray<string> taWords;
 
-    public string GetGuess(Dictionary dictionary)
+    public GuessReductionSeeker(ImmutableArray<string> laWords, ImmutableArray<string> taWords)
     {
-        string bestEverWord = "raise";
-
-        if (dictionary.LiveWords.Count == 1)
-        {
-            return dictionary.LiveWords[0];
-        }
-        else if(dictionary.LiveWords.Contains(bestEverWord))
-        {
-            return bestEverWord;
-        }
-        else
-        {
-            ImmutableArray<string> availableWords = dictionary.LiveWords.ToImmutableArray();
-            return GuessWithBestGuessFinder(availableWords);
-        }
+        this.laWords = laWords;
+        this.taWords = taWords;
     }
 
+    public ImmutableDictionary<string, int> Run()
+    {
+        var guessWordReduction = new ConcurrentDictionary<string, int>();
+        var combinedWords = laWords.AddRange(taWords);
+        string bestGuess = "";
+        object diagnosticsLock = new object();
+
+        Parallel.ForEach(combinedWords, guessWord =>
+        {
+            int reduction = 0;
+
+            Parallel.ForEach(laWords, actualWord =>
+            {
+                if (actualWord != guessWord)
+                {
+                    reduction += ReduceDictTest(laWords, actualWord, guessWord);
+                }
+            });
+
+            lock(diagnosticsLock)
+            {
+                guessWordReduction[guessWord] = reduction;
+                var sortedGuessWordReduction = guessWordReduction.OrderByDescending(x => x.Value).ToList();
+                var newBestGuess = sortedGuessWordReduction[0].Key;
+                if (newBestGuess != bestGuess)
+                {
+                    bestGuess = newBestGuess;
+
+                    Console.WriteLine(
+                        $"After {guessWordReduction.Count} reductions of {combinedWords.Length} the " + 
+                        $"best word is {sortedGuessWordReduction[0].Key} with reduction {sortedGuessWordReduction[0].Value}");
+                }
+            }
+        });
+
+        var sortedGuessWordReduction = guessWordReduction.OrderByDescending(x => x.Value).ToList();
+        return sortedGuessWordReduction.ToImmutableDictionary();
+    }
+    
     private static int ReduceDictTest(ImmutableArray<string> availableWords, string actualWord, string guessWord)
     {
         Dictionary tempDictionary = new Dictionary(availableWords);
@@ -39,33 +63,5 @@ public class GuessReductionSeeker : IGuesser
         // Console.WriteLine($"Actual {actualWord}, guess {guessWord}, reduction = {reduction}");
 
         return reduction;
-    }
-
-
-    private static string GuessWithBestGuessFinder(ImmutableArray<string> availableWords)
-    {
-        var guessWordReduction = new ConcurrentDictionary<string, int>();
-
-        //var guessWords = new[] { "aback", "puppy", "zonal", "abase" };
-
-        Parallel.ForEach(availableWords, guessWord =>
-        {
-            guessWordReduction[guessWord] = 0;
-
-            Parallel.ForEach(availableWords, actualWord =>
-            {
-                if (actualWord != guessWord)
-                {
-                    int reduction = ReduceDictTest(availableWords, actualWord, guessWord);
-                    guessWordReduction[guessWord] += reduction;
-                }
-            });
-
-            Console.WriteLine($"Completed {guessWordReduction.Count} reductions of of {availableWords.Length}");
-        });
-
-        var sortedGuessWordReduction = guessWordReduction.OrderByDescending(x => x.Value).ToList();
-        string bestGuessWord = sortedGuessWordReduction[0].Key;
-        return bestGuessWord;
     }
 }

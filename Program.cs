@@ -6,14 +6,27 @@ class Program
 {
     static void Main(string[] args)
     {
-        ImmutableArray<string> laWords = File.ReadAllLines(@".\Words\la.txt").ToImmutableArray();
+        ImmutableArray<string> laWords = File.ReadAllLines(@"./Words/la.txt").ToImmutableArray();
+        ImmutableArray<string> taWords = File.ReadAllLines(@"./Words/ta.txt").ToImmutableArray();
         Console.WriteLine($"Read {laWords.Length} words from la.txt");
+        Console.WriteLine($"Read {taWords.Length} words from ta.txt");
 
-        Dictionary dictionary = new Dictionary(laWords);
+        // var guessReductionSeeker = new GuessReductionSeeker(laWords, taWords);
+        // var guessWordReduction = guessReductionSeeker.Run();
 
-        IGuesser guesser = new GuessReductionSeeker();
-        //guesser.GetGuess(dictionary);
+        // // save guess word reduction to file
+        // using (StreamWriter file = new StreamWriter(@"./Words/guessWordReduction.csv"))
+        // {
+        //     foreach (var item in guessWordReduction)
+        //     {
+        //         file.WriteLine($"{item.Key},{item.Value}");
+        //     }
+        // }
 
+
+        Dictionary dictionary = new Dictionary(laWords.Add("roate"));
+        IGuesser guesser = new ReductionSeekerGuesser();
+        //Evaluater.Run(guesser, dictionary);
         Interactive.RunInteractiveGuessLoop(guesser, dictionary);
         //AutomaticGuesser.RunAutomaticGuessLoop(guesser, dictionary, "shank", true);
     }
